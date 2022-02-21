@@ -1,6 +1,7 @@
 import tkinter as tk
 import socket
-import threading
+from threading import Thread
+# from SocketServer import ThreadingMixIn
 from time import sleep
 
 window = tk.Tk()
@@ -30,19 +31,32 @@ scroll_bar.pack(side=tk.RIGHT, fill=tk.Y)
 text_display = tk.Text(display_frame, height=10, width=30)
 text_display.pack(side=tk.LEFT, fill=tk.Y, padx=(5, 0))
 scroll_bar.config(command=text_display.yview)
-text_display.config(yscrollcommand=scroll_bar.set, background="green", highlightbackground="grey", state="disabled")
+text_display.config(yscrollcommand=scroll_bar.set, background="#abffbc", highlightbackground="grey", state="disabled")
 display_frame.pack(side=tk.BOTTOM, pady=(5, 10))
 
 server = None
 HOST_ADDR = "0.0.0.0"
 HOST_PORT = 8080
-player_name = " "
 players = []
-players_names = []
-player_data = []
-MAX_PLAYERS = 4
+out_players = []
+MAX_PLAYERS = 1
+MAX_SCORE = 100
 
-# start server
+class Player(Thread):
+    score_array = []
+    def __init__(self, name, socket, id):
+        Thread.__init__(self)
+        self.name = name
+        self.playerSocket = socket
+        self.id = id
+
+    def addScore(self, points):
+        points += self.score_array[0]
+        self.score_array.append(points)
+    def getScore(self):
+        return self.score_array[0]
+
+    # start server
 def startServer():
     global server, HOST_ADDR, HOST_PORT
     btn_start.config(state=tk.DISABLED)
@@ -55,7 +69,7 @@ def startServer():
     server.bind((HOST_ADDR, HOST_PORT))
     server.listen(10)
 
-    threading.start_new_thread(acceptClients, (server, " "))
+    acceptClients(server)
 
     addr_col["text"] = "Address: " + HOST_ADDR
     port_col["text"] = "Port: " + str(HOST_PORT)
@@ -66,37 +80,134 @@ def stopServer():
     btn_stop.config(state=tk.DISABLED)
     btn_start.config(state=tk.NORMAL)
 
-def acceptClients(a_server, y):
+def acceptClients(a_server):
+    player_number = 1
+    while len(players) < MAX_PLAYERS:
+        cliSock, address = a_server.accept()
+
+        # ack client connection
+        msg = "CONNECTED"
+        cliSock.send(msg.encode())
+        player_name = cliSock.recv(2048)
+        new_player = Player(player_name.decode(), cliSock, player_number)
+        print(new_player.name)
+        players.append(new_player)
+        new_player.start()
+        updatePlayersDisplay()
+
+        player_number += 1
+        sleep(5)
+    print("All Players Connected")  # DISPLAY THIS ON SCREEN
+
+    # print player names to all players
+    msg = "NAMES: "
+    for x in range(0, len(players)):
+        msg += players[x].name + " "
+    for plyr in players:
+        plyr.playerSocket.send(msg.encode())
+
+    players[0].join()
+
+def gamePlay():
     while True:
-        if len(players) < MAX_PLAYERS:
-            new_player, addr = a_server.accept()
-            players.append(new_player)
-            # start new thread for every player
-            threading.start_new_thread(ACKplayer(), (new_player, addr))
+        for p in players:
+            round_score = takeTurn(p)
+            p.addScore(round_score)
+            if p.getScore() >= MAX_SCORE:
+                playerOut(p)
+        sendScores()
+        if len(players) < 2:
+            endGame()
 
-# ACK new player has joined the server
-def ACKplayer(player_connection, player_ip):
-    global server, player_name, players, player_data # WHY IS THIS HERE?????
+# ends the game and the program
+def endGame():
+    winners = []
+    # identify winner(s)
+    # scenario 1: only 1 winner
+    if len(players) == 1:
+        winners.append(players[0])
+    else:
+        # scenario 2: multiple winners, players with the longest score arrays win
+        longest_score_array = 0
 
-    client_msg = " "
-    player_name = player_connection.recv(4096)
-    for x in range (1,MAX_PLAYERS+1):
-        player_connection.send("Welcome Player " + x)
+        # find the longest score_array
+        for player in out_players:
+            if len(player.score_array) > longest_score_array:
+                longest_score_array = len(player.score_array)
 
-    players_names.append(player_name)
-    updatePlayersDisplay(players_names)
+        # find players with that length score_array and add them to the winners list
+        for player in out_players:
+            if len(player.score_array) == longest_score_array:
+                winners.append(player)
 
-    # or however we decide we want to start the game
-    if len(players) == MAX_PLAYERS:
-        sleep(1)
-        # print player list to all players
-        for plyr in players:
-            for x in range(0, len(players)):
-                plyr.send("opponent_name$" + players_names[x])
+    # send winners to all players
+    # make winners message in format "WINNERS: 1 2 3" or "WINNERS: 1"
+    msg = "WINNERS: "
+    for player in winners:
+        msg += player.id + " "
 
+    # send message
+    for player in players:
+        player.playerSocket.send(msg.encode())
+    for player in out_players:
+        player.playerSocket.send(msg.encode())
 
+    # close sockets
+    for player in players:
+        player.playerSocket.close()
+    for player in out_players:
+        player.playerSocket.close()
 
-def updatePlayersDisplay(names):
-    x = 1+1
+    exit(2)
+
+# sends every player all the players scores
+def sendScores():
+    # create the message
+    msg = ""
+    for player in players:
+        msg += player.id + ": " + player.getScore() + " "
+    for player in out_players:
+        msg += player.id + ": " + player.getScore() + " "
+
+    # send message
+    for player in players:
+        player.playerSocket.send(msg.encode())
+    for player in out_players:
+        player.playerSocket.send(msg.encode())
+
+# removes and alerts player when they are at or over max points
+def playerOut(player):
+    # remove player from players list; add to out players
+    players.remove(player)
+    out_players.append(player)
+
+    # tell player they are out of the game
+    out = "OUT"
+    player.playerSocket.send(out.encode())
+
+def updatePlayersDisplay():
+    return 0
+
+# tells the player to take their turn, then tells player to wait for their next turn
+def takeTurn(player):
+    # p.playerSocket()
+    play = "PLAY"
+    wait = "WAIT"
+    response = False
+    score = 0
+
+    # tell player to take their turn
+    player.playerSocket.send(play.encode())
+
+    # wait for player response
+    while not response:
+        data = player.playerSocket.recv().decode()
+        if data.startswith("SCORE: "):
+            response = True
+            score = int(data[7:])
+
+    # tell player to wait for their next turn
+    player.playerSocket.send(wait.encode())
+    return score
 
 window.mainloop()

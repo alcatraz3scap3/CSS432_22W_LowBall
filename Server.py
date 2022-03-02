@@ -73,7 +73,6 @@ def startServer():
 
     addr_col["text"] = "Address: " + HOST_ADDR
     port_col["text"] = "Port: " + str(HOST_PORT)
-
 # stop server
 def stopServer():
     global server
@@ -107,6 +106,13 @@ def acceptClients(a_server):
         plyr.playerSocket.send(msg.encode())
 
     players[0].join()
+
+    print("TELL HOSTS TO BEGIN GAME")     # display to server screen
+    begin_msg = "BEGIN"
+    for plyr in players:
+        plyr.playerSocket.send(begin_msg.encode())
+
+    gamePlay()
 
 def gamePlay():
     while True:
@@ -186,6 +192,15 @@ def playerOut(player):
     player.playerSocket.send(out.encode())
 
 def updatePlayersDisplay():
+    text_display.config(state=tk.NORMAL)
+    text_display.delete('1.0', tk.END)
+    text_display.insert(tk.INSERT, "TEST")
+    text_display.insert(tk.END, "Bye Bye.....")
+    text_display.pack()
+    text_display.tag_add("here", "1.0", "1.4")
+    text_display.tag_add("start", "1.8", "1.13")
+    text_display.tag_config("here", background="yellow", foreground="blue")
+    text_display.tag_config("start", background="black", foreground="green")
     return 0
 
 # tells the player to take their turn, then tells player to wait for their next turn
@@ -201,10 +216,10 @@ def takeTurn(player):
 
     # wait for player response
     while not response:
-        data = player.playerSocket.recv().decode()
+        data = player.playerSocket.recv(4096).decode()
         if data.startswith("SCORE: "):
             response = True
-            score = int(data[7:])
+            score = int(data[7:])       # gets everything after SCORE:
 
     # tell player to wait for their next turn
     player.playerSocket.send(wait.encode())

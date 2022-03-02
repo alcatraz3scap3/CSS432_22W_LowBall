@@ -8,6 +8,7 @@ import socket
 from time import sleep
 import threading
 import socket
+import random
 
 client = None
 HOST_ADDR = "192.168.1.34"
@@ -81,10 +82,7 @@ class Game:
         self.wait_label = tk.Label(self.waiting_frame, text="Waiting on server...", bg='#DCE0E1')
         self.wait_label.pack(side=tk.BOTTOM)
         self.waiting_frame.create_window(950, 500, window=self.wait_label)
-        self.root.after(0,self.wait_loop,sck)
-
-        print("after loop")
-        self.root.mainloop()
+        self.root.after(500,self.wait_loop,sck)
 
     def wait_loop(self,sck):
         while not self.from_server.decode().startswith("NAMES: "):
@@ -92,7 +90,62 @@ class Game:
             self.from_server = sck.recv(4096)
             print("after recv")
             print(self.from_server.decode())
+            print(self.from_server.decode().startswith("NAMES: "))
+        self.root.after(0, self.after_loop, sck)
 
+    def after_loop(self, sck):
+        Button(self.waiting_frame, text='Continue', fg='#000000', command=lambda: (self.main_screen(sck))).pack()
+        print("after loop")
+        self.root.mainloop()
+
+    def main_screen(self,sck):
+        dice_list = [1, 2, 3, 4, 5, 6]
+        self.all_disabled = False
+        print("in main screen")
+        self.waiting_frame.pack_forget()
+        self.main_frame = tk.Canvas(self.root, bg='#DCE0E1')
+        self.main_frame.pack(fill=BOTH, expand=True)
+        self.d1 = Button(self.main_frame,text=random.choice(dice_list),font=('',15), width=6, height=3, command=lambda: self.on_click(0))
+        self.d2 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(1))
+        self.d3 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(2))
+        self.d4 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(3))
+        self.d5 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(4))
+        self.d6 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(5))
+
+        self.reroll_btn = Button(self.main_frame, text='Reroll', fg='#000000', command=lambda: (self.reroll()))\
+        #self.reroll.pack(padx=400, pady=200, side=tk.BOTTOM)
+
+        self.d1.grid(row=0, column=0)
+        self.d2.grid(row=0, column=1)
+        self.d3.grid(row=0, column=2)
+        self.d4.grid(row=1, column=0)
+        self.d5.grid(row=1, column=1)
+        self.d6.grid(row=1, column=2)
+        self.reroll_btn.grid(row=100, column=150)
+
+        self.dice_btn_list = [self.d1, self.d2, self.d3, self.d4, self.d5, self.d6]
+
+
+
+    def reroll(self):
+        dice_list = [1, 2, 3, 4, 5, 6]
+        for btn in self.dice_btn_list:
+            if btn["state"] == "normal":
+                btn["text"] = random.choice(dice_list)
+
+
+    def on_click(self, index):
+        self.dice_btn_list[index]["state"] = "disabled"
+        self.check_btns()
+
+    def check_btns(self):
+        self.all_disabled = True
+        for btn in self.dice_btn_list:
+            if btn["state"] == "normal":
+                print("here")
+                self.all_disabled = False
+        if self.all_disabled:
+            print("all buttons are disabled")
 
 if __name__ == "__main__":
     Game()

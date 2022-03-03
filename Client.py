@@ -11,7 +11,7 @@ import socket
 import random
 
 client = None
-HOST_ADDR = "192.168.1.34"
+HOST_ADDR = "10.156.3.172"
 HOST_PORT = 8080
 
 class Player():
@@ -86,31 +86,39 @@ class Game:
 
     def wait_loop(self,sck):
         while not self.from_server.decode().startswith("NAMES: "):
-            print("in loop")
             self.from_server = sck.recv(4096)
-            print("after recv")
             print(self.from_server.decode())
             print(self.from_server.decode().startswith("NAMES: "))
         self.root.after(0, self.after_loop, sck)
 
     def after_loop(self, sck):
         Button(self.waiting_frame, text='Continue', fg='#000000', command=lambda: (self.main_screen(sck))).pack()
-        print("after loop")
         self.root.mainloop()
 
     def main_screen(self,sck):
         dice_list = [1, 2, 3, 4, 5, 6]
+        self.dice_values = [1, 2, 3, 4, 5, 6]
+        self.dice_selected = 0
+        self.rerolls = 0
+
+        self.dice_values[0] = random.choice(dice_list)
+        self.dice_values[1] = random.choice(dice_list)
+        self.dice_values[2] = random.choice(dice_list)
+        self.dice_values[3] = random.choice(dice_list)
+        self.dice_values[4] = random.choice(dice_list)
+        self.dice_values[5] = random.choice(dice_list)
+
         self.all_disabled = False
         print("in main screen")
         self.waiting_frame.pack_forget()
         self.main_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.main_frame.pack(fill=BOTH, expand=True)
-        self.d1 = Button(self.main_frame,text=random.choice(dice_list),font=('',15), width=6, height=3, command=lambda: self.on_click(0))
-        self.d2 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(1))
-        self.d3 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(2))
-        self.d4 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(3))
-        self.d5 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(4))
-        self.d6 = Button(self.main_frame, text=random.choice(dice_list), font=('', 15), width=6, height=3, command=lambda: self.on_click(5))
+        self.d1 = Button(self.main_frame,text=self.dice_values[0],font=('',15), width=6, height=3, command=lambda: self.on_click(0))
+        self.d2 = Button(self.main_frame, text=self.dice_values[1], font=('', 15), width=6, height=3, command=lambda: self.on_click(1))
+        self.d3 = Button(self.main_frame, text=self.dice_values[2], font=('', 15), width=6, height=3, command=lambda: self.on_click(2))
+        self.d4 = Button(self.main_frame, text=self.dice_values[3], font=('', 15), width=6, height=3, command=lambda: self.on_click(3))
+        self.d5 = Button(self.main_frame, text=self.dice_values[4], font=('', 15), width=6, height=3, command=lambda: self.on_click(4))
+        self.d6 = Button(self.main_frame, text=self.dice_values[5], font=('', 15), width=6, height=3, command=lambda: self.on_click(5))
 
         self.reroll_btn = Button(self.main_frame, text='Reroll', fg='#000000', command=lambda: (self.reroll()))\
         #self.reroll.pack(padx=400, pady=200, side=tk.BOTTOM)
@@ -129,20 +137,38 @@ class Game:
 
     def reroll(self):
         dice_list = [1, 2, 3, 4, 5, 6]
-        for btn in self.dice_btn_list:
-            if btn["state"] == "normal":
-                btn["text"] = random.choice(dice_list)
+        print("rerolls: " + str(self.rerolls))
+        print("dice_selected: " + str(self.dice_selected))
+        if self.rerolls < self.dice_selected:
+            for btn in self.dice_btn_list:
+                i = 0
+                if btn["state"] == "normal":
+                    self.dice_values[i] = random.choice(dice_list)
+                    btn["text"] = self.dice_values[i]
+                i += 1
+            self.rerolls += 1
+        else:
+            tk.messagebox.showerror(title="Input needed!", message="Cannot reroll dice until one has been selected!")
 
+    def check_if_selected(self):
+        selected = False
+        for btn in self.dice_btn_list:
+            if btn["state"] == "disabled":
+                selected = True
+        return selected
 
     def on_click(self, index):
         self.dice_btn_list[index]["state"] = "disabled"
+        self.dice_selected += 1
+        self.player.score += self.dice_values[index]
         self.check_btns()
+        print("Score: " + str(self.player.score))
+        print("dice_selected: " + str(self.dice_selected))
 
     def check_btns(self):
         self.all_disabled = True
         for btn in self.dice_btn_list:
             if btn["state"] == "normal":
-                print("here")
                 self.all_disabled = False
         if self.all_disabled:
             print("all buttons are disabled")

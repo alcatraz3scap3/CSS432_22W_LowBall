@@ -55,9 +55,12 @@ class Player(Thread):
         self.score_array.append(points)
     def getScore(self):
         return self.score_array[0]
+    def getName(self):
+        self.name
 
     # start server
 def startServer():
+
     global server, HOST_ADDR, HOST_PORT
     btn_start.config(state=tk.DISABLED)
     btn_stop.config(state=tk.NORMAL)
@@ -85,19 +88,19 @@ def acceptClients(a_server):
         cliSock, address = a_server.accept()
 
         # ack client connection
-        msg = "CONNECTED"
-        cliSock.send(msg.encode())
+        connected = "CONNECTED"
+        cliSock.send(connected.encode())
         player_name = cliSock.recv(2048)
         new_player = Player(player_name.decode(), cliSock, player_number)
         print(new_player.name)
         players.append(new_player)
         new_player.start()
-        updatePlayersDisplay()
 
         player_number += 1
-        sleep(5)
+        updatePlayersDisplay()
     print("All Players Connected")  # DISPLAY THIS ON SCREEN
 
+    sleep(3)
     # print player names to all players
     msg = "NAMES: "
     for x in range(0, len(players)):
@@ -107,6 +110,7 @@ def acceptClients(a_server):
 
     players[0].join()
 
+    sleep(3)
     print("TELL HOSTS TO BEGIN GAME")     # display to server screen
     begin_msg = "BEGIN"
     for plyr in players:
@@ -192,16 +196,18 @@ def playerOut(player):
     player.playerSocket.send(out.encode())
 
 def updatePlayersDisplay():
+    print("here")
     text_display.config(state=tk.NORMAL)
     text_display.delete('1.0', tk.END)
-    text_display.insert(tk.INSERT, "TEST")
-    text_display.insert(tk.END, "Bye Bye.....")
-    text_display.pack()
-    text_display.tag_add("here", "1.0", "1.4")
-    text_display.tag_add("start", "1.8", "1.13")
-    text_display.tag_config("here", background="yellow", foreground="blue")
-    text_display.tag_config("start", background="black", foreground="green")
-    return 0
+
+    for c in players:
+        player_name = c.getName()
+        text_display.insert(tk.END, c.name + '\n')
+    text_display.config(state=tk.DISABLED)
+    window.update()
+
+#def helpUpdatePlayers():
+
 
 # tells the player to take their turn, then tells player to wait for their next turn
 def takeTurn(player):

@@ -51,12 +51,19 @@ class Player(Thread):
         self.id = id
 
     def addScore(self, points):
-        points += self.score_array[0]
-        self.score_array.append(points)
+        # cumulative score array
+        if len(self.score_array) != 0:
+            points += self.score_array[0]
+            self.score_array.append(points)
+        else:
+            self.score_array.append(points)
     def getScore(self):
-        return self.score_array[0]
+        return self.score_array[len(self.score_array) - 1]
     def getName(self):
-        self.name
+        return self.name
+    def getID(self):
+        id_str = str(self.id)
+        return id_str
 
     # start server
 def startServer():
@@ -110,27 +117,33 @@ def acceptClients(a_server):
 
     players[0].join()
 
-    sleep(3)
-    print("TELL HOSTS TO BEGIN GAME")     # display to server screen
-    begin_msg = "BEGIN"
-    for plyr in players:
-        plyr.playerSocket.send(begin_msg.encode())
+    # let players all ACK the begining of the game
+    players_ack = 0
+    while not players_ack >= MAX_PLAYERS:
+        for player in players:
+            data = player.playerSocket.recv(4096).decode()
+            if data.startswith("BEGIN"):
+                players_ack += 1
 
     gamePlay()
 
 def gamePlay():
     while True:
         for p in players:
+            print(p.getName() + " player " + p.getID() + " turn")
             round_score = takeTurn(p)
             p.addScore(round_score)
             if p.getScore() >= MAX_SCORE:
                 playerOut(p)
+        print("ALL PLAYERS HAVE TAKEN THEIR TURN")
         sendScores()
+        print("SENT SCORES TO PLAYERS")
         if len(players) < 2:
             endGame()
 
 # ends the game and the program
 def endGame():
+    print("END GAME")
     winners = []
     # identify winner(s)
     # scenario 1: only 1 winner
@@ -154,7 +167,7 @@ def endGame():
     # make winners message in format "WINNERS: 1 2 3" or "WINNERS: 1"
     msg = "WINNERS: "
     for player in winners:
-        msg += player.id + " "
+        msg += player.getID() + " "
 
     # send message
     for player in players:
@@ -175,9 +188,9 @@ def sendScores():
     # create the message
     msg = ""
     for player in players:
-        msg += player.id + ": " + player.getScore() + " "
+        msg += player.getID() + ": " + str(player.getScore()) + " "
     for player in out_players:
-        msg += player.id + ": " + player.getScore() + " "
+        msg += player.getID() + " YOUR OUT on round: " + len(player.score_array) + " "
 
     # send message
     for player in players:
@@ -201,17 +214,22 @@ def updatePlayersDisplay():
     text_display.delete('1.0', tk.END)
 
     for c in players:
-        player_name = c.getName()
-        text_display.insert(tk.END, c.name + '\n')
+        if len(c.score_array) > 0:
+            text_display.insert(tk.END, c.name + ': player ' + c.getID() + ' score: ' + c.getScore() + '\n')
+        else:
+            text_display.insert(tk.END, c.name + ': player ' + c.getID() + '\n')
     text_display.config(state=tk.DISABLED)
+
+    if len(out_players) > 0:
+        text_display.insert(tk.END, 'OUT PLAYERS: \n')
+        for c in out_players:
+            text_display.insert(tk.END, c.name + ' out on round: ' + len(c.score_array) + '\n')
     window.update()
-
-#def helpUpdatePlayers():
-
 
 # tells the player to take their turn, then tells player to wait for their next turn
 def takeTurn(player):
     # p.playerSocket()
+    print("TAKE TURN")
     play = "PLAY"
     wait = "WAIT"
     response = False
@@ -219,6 +237,7 @@ def takeTurn(player):
 
     # tell player to take their turn
     player.playerSocket.send(play.encode())
+    print("player " + player.name + " turn, sent PLAY to client")
 
     # wait for player response
     while not response:
@@ -226,9 +245,11 @@ def takeTurn(player):
         if data.startswith("SCORE: "):
             response = True
             score = int(data[7:])       # gets everything after SCORE:
+            print(score)
 
     # tell player to wait for their next turn
     player.playerSocket.send(wait.encode())
+    print("player " + player.name + " turn over, sent WAIT to client")
     return score
 
 window.mainloop()

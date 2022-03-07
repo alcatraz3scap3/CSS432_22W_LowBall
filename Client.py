@@ -46,6 +46,9 @@ class Game:
 
         Button(self.welcome_frame, text='Submit', fg='#000000',
                command=lambda: (self.set_player_name(), self.connect_screen())).pack()
+        self.test_display = tk.Text(self.root, height=30, width=90)
+        self.test_display.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
+        self.test_display.config(background="#abffbc", highlightbackground="grey", state="disabled")
 
     def set_player_name(self):
         self.player.name = self.entry1.get()
@@ -55,9 +58,12 @@ class Game:
         self.entry1.destroy()
         self.connect_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.connect_frame.pack(fill=BOTH, expand=True)
-        self.label1 = tk.Label(self.connect_frame, text=self.player.name, bg='#DCE0E1')
-        self.label1.pack(side=tk.BOTTOM)
-        self.connect_frame.create_window(950, 500, window=self.label1)
+        #self.label1 = tk.Label(self.connect_frame, text=self.player.name, bg='#DCE0E1')
+        #self.label1.pack(side=tk.BOTTOM)
+        self.test_display.config(state=tk.NORMAL)
+        self.test_display.insert(tk.END, self.player.name + ': ' + str(self.player.score) + '\n')
+        self.test_display.config(state=tk.DISABLED)
+        #self.connect_frame.create_window(950, 500, window=self.label1)
 
         Button(self.connect_frame, text='Connect', fg='#000000',
                command=lambda: (self.connect_to_server())).pack(padx=400, pady=200)
@@ -121,7 +127,9 @@ class Game:
         self.d5 = Button(self.main_frame, text=self.dice_values[4], font=('', 15), width=6, height=3, command=lambda: self.on_click(4, sck))
         self.d6 = Button(self.main_frame, text=self.dice_values[5], font=('', 15), width=6, height=3, command=lambda: self.on_click(5, sck))
 
-        self.reroll_btn = Button(self.main_frame, text='Reroll', fg='#000000', command=lambda: (self.reroll()))\
+        self.reroll_btn = Button(self.main_frame, text='Reroll', fg='#000000', command=lambda: (self.reroll()))
+        self.exit_btn = Button(self.main_frame, text="Exit", fg='#000000', command=lambda: (self.exit_game(sck)))
+        self.unreg_btn = Button(self.main_frame, text="Exit and unregister", fg='#000000', command=lambda: (self.unreg_game(sck)))
         #self.reroll.pack(padx=400, pady=200, side=tk.BOTTOM)
 
         self.d1.grid(row=0, column=0)
@@ -130,7 +138,11 @@ class Game:
         self.d4.grid(row=1, column=0)
         self.d5.grid(row=1, column=1)
         self.d6.grid(row=1, column=2)
-        self.reroll_btn.grid(row=100, column=150)
+        self.reroll_btn.grid(row=2, column=2)
+        self.exit_btn.grid(row=2, column=1)
+
+        #self.player_scores = tk.Canvas(self.root, bg='#DCE0E1')
+        #self.player_scores.pack(fill=BOTH, expand=True, side=tk.RIGHT)
 
         self.dice_btn_list = [self.d1, self.d2, self.d3, self.d4, self.d5, self.d6]
         self.wait_play(sck)
@@ -201,6 +213,18 @@ class Game:
             sck.send(("SCORE: " + str(self.player.score)).encode())
             self.main_frame.pack_forget()
             self.main_screen(sck)
+
+    def exit_game(self, sck):
+        sck.send("EXIT".encode())
+        #wait for server to get exit?
+        self.close_sck()
+        self.root.destroy()
+
+    def unreg_game(self, sck):
+        sck.send("UNREG".encode())
+        # wait for server to get exit?
+        self.close_sck()
+        self.root.destroy()
 
 if __name__ == "__main__":
     Game()

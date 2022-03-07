@@ -107,6 +107,7 @@ class Game:
         self.dice_values = [1, 2, 0, 4, 5, 6]
         self.dice_selected = False
         self.rerolls = 0
+        self.turn = 0
 
         self.dice_values[0] = random.choice(dice_list)
         self.dice_values[1] = random.choice(dice_list)
@@ -151,6 +152,7 @@ class Game:
 
     def wait_play(self, sck):
         print("in wait_play")
+        self.from_server = b""
         for child in self.main_frame.winfo_children():
             child.configure(state='disable')
         while not self.from_server.decode().startswith("PLAY"):
@@ -212,13 +214,14 @@ class Game:
         if self.all_disabled:
             print("all buttons are disabled")
             sck.send(("SCORE: " + str(self.player.score)).encode())
+            self.turn += 1
             self.after_turn(sck)
-            
+
     def after_turn(self, sck):
         dice_list = [1, 2, 0, 4, 5, 6]
         i = 0
         for btn in self.dice_btn_list:
-            btn["state"] = "normal"
+            btn["state"] = "disabled"
             self.dice_values[i] = random.choice(dice_list)
             btn["text"] = self.dice_values[i]
             i += 1

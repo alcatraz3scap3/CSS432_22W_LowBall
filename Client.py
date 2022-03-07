@@ -11,7 +11,7 @@ import socket
 import random
 
 client = None
-HOST_ADDR = "10.102.78.125"
+HOST_ADDR = "10.102.92.57"
 HOST_PORT = 8080
 
 class Player():
@@ -140,6 +140,7 @@ class Game:
         self.d6.grid(row=1, column=2)
         self.reroll_btn.grid(row=2, column=2)
         self.exit_btn.grid(row=2, column=1)
+        self.unreg_btn.grid(row=2, column=0)
 
         #self.player_scores = tk.Canvas(self.root, bg='#DCE0E1')
         #self.player_scores.pack(fill=BOTH, expand=True, side=tk.RIGHT)
@@ -211,8 +212,17 @@ class Game:
         if self.all_disabled:
             print("all buttons are disabled")
             sck.send(("SCORE: " + str(self.player.score)).encode())
-            self.main_frame.pack_forget()
-            self.main_screen(sck)
+            self.after_turn(sck)
+            
+    def after_turn(self, sck):
+        dice_list = [1, 2, 0, 4, 5, 6]
+        i = 0
+        for btn in self.dice_btn_list:
+            btn["state"] = "normal"
+            self.dice_values[i] = random.choice(dice_list)
+            btn["text"] = self.dice_values[i]
+            i += 1
+        self.wait_play(sck)
 
     def exit_game(self, sck):
         sck.send("EXIT".encode())

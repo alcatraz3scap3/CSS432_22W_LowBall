@@ -181,8 +181,8 @@ class Game:
             if self.from_server.decode().startswith("SCORES: "):
                 self.the_message = self.from_server.decode()
                 while not self.from_server.decode().startswith("RECV ACK"):
-                    self.from_server = sck.recv(4096)
                     sck.send(("RECV SCORE " + self.player.name).encode())
+                    self.from_server = sck.recv(4096)
                 self.get_scores()
                 self.from_server = b""
         for child in self.main_frame.winfo_children():

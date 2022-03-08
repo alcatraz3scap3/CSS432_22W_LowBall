@@ -11,7 +11,7 @@ import socket
 import random
 
 client = None
-HOST_ADDR = "10.102.92.57"
+HOST_ADDR = "10.102.104.16"
 HOST_PORT = 8080
 
 class Player():
@@ -185,6 +185,16 @@ class Game:
                     self.from_server = sck.recv(4096)
                 self.get_scores()
                 self.from_server = b""
+            if self.from_server.decode().startswith("WINNERS:"):
+                self.main_frame.pack_forget()
+                self.end_screen = tk.canvas(self.root, bg='#DCE0E1')
+                self.main_frame.pack(fill=BOTH, expand=True)
+                Button(self.end_screen, text='Exit', fg='#000000',
+                       command=lambda: (self.exit_game(sck))).pack(padx=400, pady=200)
+                message = ""
+                message += self.from_server.decode()[9:]
+                tk.messagebox.showerror(title="Game Over!", message=message)
+
         for child in self.main_frame.winfo_children():
             child.configure(state='normal')
         self.root.mainloop()
@@ -259,6 +269,7 @@ class Game:
         #wait for server to get exit?
         self.close_sck()
         self.root.destroy()
+        exit(0)
 
     def unreg_game(self, sck):
         sck.send("UNREG".encode())

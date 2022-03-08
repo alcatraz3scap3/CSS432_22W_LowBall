@@ -186,18 +186,24 @@ class Game:
                 self.get_scores()
                 self.from_server = b""
             if self.from_server.decode().startswith("WINNERS:"):
-                self.main_frame.pack_forget()
-                self.end_screen = tk.canvas(self.root, bg='#DCE0E1')
-                self.main_frame.pack(fill=BOTH, expand=True)
-                Button(self.end_screen, text='Exit', fg='#000000',
-                       command=lambda: (self.exit_game(sck))).pack(padx=400, pady=200)
-                message = ""
-                message += self.from_server.decode()[9:]
-                tk.messagebox.showerror(title="Game Over!", message=message)
-
+                break
+                
+        if self.from_server.decode().startswith("WINNERS:"):
+            self.end_game(sck)
+            self.root.update()
         for child in self.main_frame.winfo_children():
             child.configure(state='normal')
         self.root.mainloop()
+
+    def end_game(self, sck):
+        self.main_frame.pack_forget()
+        self.end_screen = tk.Canvas(self.root, bg='#DCE0E1')
+        self.main_frame.pack(fill=BOTH, expand=True)
+        Button(self.end_screen, text='Exit', fg='#000000',
+               command=lambda: (self.exit_game(sck))).pack(padx=400, pady=200)
+        message = ""
+        message += self.from_server.decode()[9:]
+        tk.messagebox.showerror(title="Game Over!", message="Winners are: " + message)
 
     def get_scores(self):
         self.test_display.config(state=tk.NORMAL)
@@ -255,6 +261,7 @@ class Game:
             self.after_turn(sck)
 
     def after_turn(self, sck):
+        self.player.score = 0
         dice_list = [1, 2, 0, 4, 5, 6]
         i = 0
         for btn in self.dice_btn_list:

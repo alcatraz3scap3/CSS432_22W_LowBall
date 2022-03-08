@@ -179,7 +179,10 @@ class Game:
             self.d6.grid(row=1, column=2)
             self.reroll_btn.grid(row=100, column=150)
             if self.from_server.decode().startswith("SCORES: "):
-                sck.send("RECV SCORE".encode())
+                self.the_message = self.from_server.decode()
+                while not self.from_server.decode().startswith("RECV ACK"):
+                    self.from_server = sck.recv(4096)
+                    sck.send(("RECV SCORE " + self.player.name).encode())
                 self.get_scores()
                 self.from_server = b""
         for child in self.main_frame.winfo_children():
@@ -190,14 +193,12 @@ class Game:
         self.test_display.config(state=tk.NORMAL)
         self.test_display.delete("1.0", "end")
         message = ""
-        message += self.from_server.decode()[7:]
+        message += self.the_message[7:]
         print(message)
         self.test_display.insert(tk.END, message + '\n')
         self.test_display.config(state=tk.DISABLED)
         self.root.update()
-        for child in self.main_frame.winfo_children():
-            child.configure(state='normal')
-        self.root.mainloop()
+
 
     def reroll(self):
         dice_list = [1, 2, 0, 4, 5, 6]

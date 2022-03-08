@@ -39,16 +39,16 @@ HOST_ADDR = "0.0.0.0"
 HOST_PORT = 8080
 players = []
 out_players = []
-MAX_PLAYERS = 1
-MAX_SCORE = 100
+MAX_PLAYERS = 2
+MAX_SCORE = 15
 
 class Player(Thread):
-    score_array = []
-    def __init__(self, name, socket, id):
+    def __init__(self, name, socket, num):
         Thread.__init__(self)
         self.name = name
         self.playerSocket = socket
-        self.id = id
+        self.num = num
+        self.score_array = []
 
     def addScore(self, points):
         # cumulative score array
@@ -59,11 +59,15 @@ class Player(Thread):
             self.score_array.append(points)
     def getScore(self):
         return self.score_array[len(self.score_array) - 1]
+    def getScoreS(self):
+        score = self.getScore()
+        score_s = "%s" % score
+        return score_s
     def getName(self):
         return self.name
-    def getID(self):
-        id_str = str(self.id)
-        return id_str
+    def getNum(self):
+        num_s = "%s" % self.num
+        return num_s
 
     # start server
 def startServer():
@@ -92,6 +96,7 @@ def stopServer():
 def acceptClients(a_server):
     player_number = 1
     while len(players) < MAX_PLAYERS:
+        print("waiting for connections")
         cliSock, address = a_server.accept()
 
         # ack client connection
@@ -111,13 +116,11 @@ def acceptClients(a_server):
     # print player names to all players
     msg = "NAMES: "
     for x in range(0, len(players)):
-        msg += players[x].name + " "
+        msg += players[x].name + ": player " + players[x].getNum() + "\n"
     for plyr in players:
         plyr.playerSocket.send(msg.encode())
 
-    players[0].join()
-
-    # let players all ACK the begining of the game
+    # let players all ACK the beginning of the game
     players_ack = 0
     while not players_ack >= MAX_PLAYERS:
         for player in players:
@@ -130,14 +133,19 @@ def acceptClients(a_server):
 def gamePlay():
     while True:
         for p in players:
-            print(p.getName() + " player " + p.getID() + " turn")
+            print(p.getName() + " player " + p.getNum() + " turn")
             round_score = takeTurn(p)
             p.addScore(round_score)
+            added_score = str(p.getScore())
+            print(added_score)
+        print("ALL PLAYERS HAVE TAKEN THEIR TURN")
+        for p in players:
             if p.getScore() >= MAX_SCORE:
                 playerOut(p)
-        print("ALL PLAYERS HAVE TAKEN THEIR TURN")
         sendScores()
-        print("SENT SCORES TO PLAYERS")
+        print("sent scores")
+        updatePlayersDisplay()
+        print("SENT SCORES TO PLAYERS, SERVER WINDOW IS UPDATED")
         if len(players) < 2:
             endGame()
 
@@ -150,7 +158,7 @@ def endGame():
     if len(players) == 1:
         winners.append(players[0])
     else:
-        # scenario 2: multiple winners, players with the longest score arrays win
+        # scenario 2: multiple winners, players with the longest score arrays win (aka they hit max same round)
         longest_score_array = 0
 
         # find the longest score_array
@@ -167,7 +175,7 @@ def endGame():
     # make winners message in format "WINNERS: 1 2 3" or "WINNERS: 1"
     msg = "WINNERS: "
     for player in winners:
-        msg += player.getID() + " "
+        msg += player.getNum() + " "
 
     # send message
     for player in players:
@@ -181,16 +189,18 @@ def endGame():
     for player in out_players:
         player.playerSocket.close()
 
+    players[0].join()
     exit(2)
 
 # sends every player all the players scores
 def sendScores():
+    print("SENDING SCORES TO ALL PLAYERS")
     # create the message
-    msg = ""
+    msg = "SCORES: "
     for player in players:
-        msg += player.getID() + ": " + str(player.getScore()) + " "
+        msg += player.getName() + ", player " + player.getNum() + ": " + player.getScoreS() + "\n"
     for player in out_players:
-        msg += player.getID() + " YOUR OUT on round: " + len(player.score_array) + " "
+        msg += player.getName() + ", player " + player.getNum() + " OUT round: " + str(len(player.score_array)) + "\n"
 
     # send message
     for player in players:
@@ -198,8 +208,31 @@ def sendScores():
     for player in out_players:
         player.playerSocket.send(msg.encode())
 
+    # get ack from players that scores have been sent
+    recvd = 0
+    while recvd < MAX_PLAYERS:
+        for player in players:
+            print("waiting to recv ack from clis")
+            if player.playerSocket.recv(4096).decode().startswith("RECV SCORE"):
+                recvd += 1
+                print("GOT " + str(recvd) + " SCORE ACK")
+                player.playerSocket.send("RECV ACK".encode())
+            else:
+                break
+        for player in out_players:
+            print("waiting to recv ack from clis")
+            if player.playerSocket.recv(4096).decode().startswith("RECV SCORE"):
+                recvd += 1
+                print("GOT " + str(recvd) + " SCORE ACK")
+                player.playerSocket.send("RECV ACK".encode())
+            else:
+                break
+
+
 # removes and alerts player when they are at or over max points
 def playerOut(player):
+    print("REMOVING PLAYER: " + player.getName() + ", player " + player.getNum())
+
     # remove player from players list; add to out players
     players.remove(player)
     out_players.append(player)
@@ -209,27 +242,27 @@ def playerOut(player):
     player.playerSocket.send(out.encode())
 
 def updatePlayersDisplay():
-    print("here")
+    print("UPDATING PLAYER DISPLAY")
     text_display.config(state=tk.NORMAL)
     text_display.delete('1.0', tk.END)
 
     for c in players:
         if len(c.score_array) > 0:
-            text_display.insert(tk.END, c.name + ': player ' + c.getID() + ' score: ' + c.getScore() + '\n')
+            text_display.insert(tk.END, c.getName() + ': player ' + c.getNum() + ' score: ' + c.getScoreS() + '\n')
         else:
-            text_display.insert(tk.END, c.name + ': player ' + c.getID() + '\n')
+            text_display.insert(tk.END, c.getName() + ': player ' + c.getNum() + '\n')
     text_display.config(state=tk.DISABLED)
 
     if len(out_players) > 0:
         text_display.insert(tk.END, 'OUT PLAYERS: \n')
         for c in out_players:
-            text_display.insert(tk.END, c.name + ' out on round: ' + len(c.score_array) + '\n')
+            text_display.insert(tk.END, c.getName() + ' out on round: ' + str(len(c.score_array)) + '\n')
     window.update()
 
 # tells the player to take their turn, then tells player to wait for their next turn
 def takeTurn(player):
     # p.playerSocket()
-    print("TAKE TURN")
+    print(player.getName() + ", player" + player.getNum() + " TAKES THEIR TAKE TURN")
     play = "PLAY"
     wait = "WAIT"
     response = False
@@ -237,7 +270,7 @@ def takeTurn(player):
 
     # tell player to take their turn
     player.playerSocket.send(play.encode())
-    print("player " + player.name + " turn, sent PLAY to client")
+    print("player " + player.getName() + " turn, sent PLAY to client")
 
     # wait for player response
     while not response:
@@ -249,7 +282,7 @@ def takeTurn(player):
 
     # tell player to wait for their next turn
     player.playerSocket.send(wait.encode())
-    print("player " + player.name + " turn over, sent WAIT to client")
+    print("player " + player.getName() + " turn over, sent WAIT to client")
     return score
 
 window.mainloop()

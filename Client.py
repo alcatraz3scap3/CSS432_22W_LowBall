@@ -96,7 +96,19 @@ class Game:
             print(self.from_server.decode())
             print(self.from_server.decode().startswith("NAMES: "))
         sck.send("BEGIN".encode())
-        self.root.after(0, self.after_loop, sck)
+        self.root.after(0, self.initialize_names, sck)
+
+    def initialize_names(self, sck):
+        print("in init names")
+        self.test_display.config(state=tk.NORMAL)
+        self.test_display.delete("1.0", "end")
+        message = ""
+        message += self.from_server.decode()[7:]
+        print(message)
+        self.test_display.insert(tk.END, message + '\n')
+        self.test_display.config(state=tk.DISABLED)
+        self.root.update()
+        self.root.after(0, self.after_loop(sck))
 
     def after_loop(self, sck):
         Button(self.waiting_frame, text='Continue', fg='#000000', command=lambda: (self.main_screen(sck))).pack()
@@ -225,6 +237,19 @@ class Game:
             self.dice_values[i] = random.choice(dice_list)
             btn["text"] = self.dice_values[i]
             i += 1
+        while not self.from_server.decode().startswith("SCORE: "):
+            self.from_server = sck.recv(4096)
+            print(self.from_server.decode())
+            print(self.from_server.decode().startswith("SCORE: "))
+        sck.send("RECV SCORE".encode())
+        self.test_display.config(state=tk.NORMAL)
+        self.test_display.delete("1.0", "end")
+        message = ""
+        message += self.from_server.decode()[7:]
+        print(message)
+        self.test_display.insert(tk.END, message + '\n')
+        self.test_display.config(state=tk.DISABLED)
+        self.root.update()
         self.wait_play(sck)
 
     def exit_game(self, sck):

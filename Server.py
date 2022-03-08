@@ -40,7 +40,7 @@ HOST_PORT = 8080
 players = []
 out_players = []
 MAX_PLAYERS = 2
-MAX_SCORE = 15
+MAX_SCORE = 50
 
 class Player(Thread):
     def __init__(self, name, socket, num):
@@ -53,7 +53,7 @@ class Player(Thread):
     def addScore(self, points):
         # cumulative score array
         if len(self.score_array) != 0:
-            points += self.score_array[0]
+            points += self.score_array[len(self.score_array) - 1]
             self.score_array.append(points)
         else:
             self.score_array.append(points)
@@ -110,7 +110,6 @@ def acceptClients(a_server):
 
         player_number += 1
         updatePlayersDisplay()
-    print("All Players Connected")  # DISPLAY THIS ON SCREEN
 
     sleep(3)
     # print player names to all players
@@ -133,19 +132,23 @@ def acceptClients(a_server):
 def gamePlay():
     while True:
         for p in players:
-            print(p.getName() + " player " + p.getNum() + " turn")
             round_score = takeTurn(p)
             p.addScore(round_score)
-            added_score = str(p.getScore())
-            print(added_score)
-        print("ALL PLAYERS HAVE TAKEN THEIR TURN")
-        for p in players:
-            if p.getScore() >= MAX_SCORE:
-                playerOut(p)
+            print("PLAYERS CUMULATIVE SCORE: ")
+            print(p.getScoreS())
+        all_checked = False
+        while not all_checked:
+            for p in players:
+                if p.getScore() >= MAX_SCORE:
+                    playerOut(p)
+                    all_checked = False
+                else:
+                    all_checked = True
+            if len(players) == 0:
+                all_checked = True
         sendScores()
-        print("sent scores")
         updatePlayersDisplay()
-        print("SENT SCORES TO PLAYERS, SERVER WINDOW IS UPDATED")
+        sleep(4)
         if len(players) < 2:
             endGame()
 
@@ -154,7 +157,8 @@ def endGame():
     print("END GAME")
     winners = []
     # identify winner(s)
-    # scenario 1: only 1 winner
+
+    # scenario 1: only 1 winner: all other players are out previous rounds
     if len(players) == 1:
         winners.append(players[0])
     else:
@@ -175,8 +179,19 @@ def endGame():
     # make winners message in format "WINNERS: 1 2 3" or "WINNERS: 1"
     msg = "WINNERS: "
     for player in winners:
-        msg += player.getNum() + " "
+        msg += player.getName() + ", player" + player.getNum() + "\n"
 
+    # update server display
+    text_display.config(state=tk.NORMAL)    # enables text_display editing
+    text_display.delete('1.0', tk.END)  # deletes current text display
+
+    text_display.insert(tk.END, msg)
+
+    text_display.config(state=tk.DISABLED)  # disables text_display editing
+    window.update()
+
+    print(msg)
+    sleep(4)
     # send message
     for player in players:
         player.playerSocket.send(msg.encode())
@@ -189,18 +204,16 @@ def endGame():
     for player in out_players:
         player.playerSocket.close()
 
-    players[0].join()
     exit(2)
 
 # sends every player all the players scores
 def sendScores():
-    print("SENDING SCORES TO ALL PLAYERS")
     # create the message
     msg = "SCORES: "
     for player in players:
         msg += player.getName() + ", player " + player.getNum() + ": " + player.getScoreS() + "\n"
     for player in out_players:
-        msg += player.getName() + ", player " + player.getNum() + " OUT round: " + str(len(player.score_array)) + "\n"
+        msg += player.getName() + ", player " + player.getNum() + " OUT round: " + str(len(player.score_array)) + " with score: " + player.getScoreS() + "\n"
 
     # send message
     for player in players:
@@ -212,18 +225,18 @@ def sendScores():
     recvd = 0
     while recvd < MAX_PLAYERS:
         for player in players:
-            print("waiting to recv ack from clis")
+            print("waiting to recv ack from clis in PLAYERS")
             if player.playerSocket.recv(4096).decode().startswith("RECV SCORE"):
                 recvd += 1
-                print("GOT " + str(recvd) + " SCORE ACK")
+                print("GOT " + str(recvd) + " SCORE ACK in players from: " + player.getName())
                 player.playerSocket.send("RECV ACK".encode())
             else:
                 break
         for player in out_players:
-            print("waiting to recv ack from clis")
+            print("waiting to recv ack from clis FROM OUT PLAYERS")
             if player.playerSocket.recv(4096).decode().startswith("RECV SCORE"):
                 recvd += 1
-                print("GOT " + str(recvd) + " SCORE ACK")
+                print("GOT " + str(recvd) + " SCORE ACK in players_out from: " + player.getName())
                 player.playerSocket.send("RECV ACK".encode())
             else:
                 break
@@ -237,32 +250,30 @@ def playerOut(player):
     players.remove(player)
     out_players.append(player)
 
-    # tell player they are out of the game
-    out = "OUT"
-    player.playerSocket.send(out.encode())
+    # tell player they are out of the game: include for more than
+    # out = "OUT"
+    # player.playerSocket.send(out.encode())
 
 def updatePlayersDisplay():
-    print("UPDATING PLAYER DISPLAY")
     text_display.config(state=tk.NORMAL)
     text_display.delete('1.0', tk.END)
 
     for c in players:
         if len(c.score_array) > 0:
-            text_display.insert(tk.END, c.getName() + ': player ' + c.getNum() + ' score: ' + c.getScoreS() + '\n')
+            text_display.insert(tk.END, c.getName() + ', player ' + c.getNum() + ' score: ' + c.getScoreS() + '\n')
         else:
-            text_display.insert(tk.END, c.getName() + ': player ' + c.getNum() + '\n')
-    text_display.config(state=tk.DISABLED)
+            text_display.insert(tk.END, c.getName() + ', player ' + c.getNum() + '\n')
 
     if len(out_players) > 0:
         text_display.insert(tk.END, 'OUT PLAYERS: \n')
         for c in out_players:
             text_display.insert(tk.END, c.getName() + ' out on round: ' + str(len(c.score_array)) + '\n')
+
+    text_display.config(state=tk.DISABLED)
     window.update()
 
 # tells the player to take their turn, then tells player to wait for their next turn
 def takeTurn(player):
-    # p.playerSocket()
-    print(player.getName() + ", player" + player.getNum() + " TAKES THEIR TAKE TURN")
     play = "PLAY"
     wait = "WAIT"
     response = False
@@ -270,7 +281,6 @@ def takeTurn(player):
 
     # tell player to take their turn
     player.playerSocket.send(play.encode())
-    print("player " + player.getName() + " turn, sent PLAY to client")
 
     # wait for player response
     while not response:
@@ -278,6 +288,7 @@ def takeTurn(player):
         if data.startswith("SCORE: "):
             response = True
             score = int(data[7:])       # gets everything after SCORE:
+            print("PLAYER SENT SCORE: ")
             print(score)
 
     # tell player to wait for their next turn

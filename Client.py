@@ -187,8 +187,9 @@ class Game:
                 self.from_server = b""
             if self.from_server.decode().startswith("WINNERS:"):
                 break
-                
+
         if self.from_server.decode().startswith("WINNERS:"):
+
             self.end_game(sck)
             self.root.update()
         for child in self.main_frame.winfo_children():
@@ -198,12 +199,13 @@ class Game:
     def end_game(self, sck):
         self.main_frame.pack_forget()
         self.end_screen = tk.Canvas(self.root, bg='#DCE0E1')
-        self.main_frame.pack(fill=BOTH, expand=True)
+        self.end_screen.pack(fill=BOTH, expand=True)
         Button(self.end_screen, text='Exit', fg='#000000',
                command=lambda: (self.exit_game(sck))).pack(padx=400, pady=200)
         message = ""
         message += self.from_server.decode()[9:]
         tk.messagebox.showerror(title="Game Over!", message="Winners are: " + message)
+        self.root.mainloop()
 
     def get_scores(self):
         self.test_display.config(state=tk.NORMAL)

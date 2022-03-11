@@ -231,7 +231,7 @@ class Game:
         self.end_screen = tk.Canvas(self.root, bg='#DCE0E1')
         self.end_screen.pack(fill=BOTH, expand=True)
         Button(self.end_screen, text='Exit', fg='#000000',
-               command=lambda: (self.exit_game(sck))).pack(padx=400, pady=200)
+               command=lambda: (self.end_game_exit())).pack(padx=400, pady=200)
         message = ""
         message += self.from_server.decode()[9:]
         tk.messagebox.showerror(title="Game Over!", message="Winners are: " + message)
@@ -319,6 +319,12 @@ class Game:
             self.from_server = sck.recv(4096)
         self.close_sck()
         self.root.destroy()
+        exit(0)
+
+    def end_game_exit(self):
+        self.close_sck()
+        self.root.destroy()
+        exit(0)
 
 
 if __name__ == "__main__":

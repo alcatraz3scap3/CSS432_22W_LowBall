@@ -28,6 +28,7 @@ class Game:
 
 
     def __init__(self):
+        #initial setup, create the base screen everything will be tied to
         self.root = tk.Tk()
         self.root.title('Low Ball')
         self.root.geometry("1920x1080+10+20")
@@ -38,9 +39,11 @@ class Game:
         self.client.close()
 
     def welcome_screen(self):
+        #very first screen to pop up.
         self.welcome_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.welcome_frame.pack(fill=BOTH, expand=True)
 
+        #label and object for player to enter their name in
         Label(self.welcome_frame, text='Enter name',
               bg='#DCE0E1', fg='#000000',
               font=('', 20)).pack(padx=10, pady=40)
@@ -55,27 +58,26 @@ class Game:
         self.test_display.config(background="#abffbc", highlightbackground="grey", state="disabled")
 
     def set_player_name(self):
+        #save the players name
         self.player.name = self.entry1.get()
 
     def connect_screen(self):
+        #open file to use for last used ip address of server
         self.file = open("server_ip.txt", "a")  #to create the file
         self.file.close()
         self.file = open("server_ip.txt", "r")
+        #get rid of stuff from first welcome screen
         self.welcome_frame.pack_forget()
         self.entry1.destroy()
         self.connect_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.connect_frame.pack(fill=BOTH, expand=True)
-        # self.label1 = tk.Label(self.connect_frame, text=self.player.name, bg='#DCE0E1')
-        # self.label1.pack(side=tk.BOTTOM)
         self.test_display.config(state=tk.NORMAL)
-        #print(self.file.read())
         self.file_content = self.file.read().rstrip()
-        print(self.file_content)
         self.file.close()
         m = 'Please enter IP address of server to continue \n' + 'Last used IP address: ' + self.file_content + '\n' + self.player.name + ': ' + str(self.player.score) + '\n'
+        #display player name, current score (0), and last used IP for server
         self.test_display.insert(tk.END, m)
         self.test_display.config(state=tk.DISABLED)
-        # self.connect_frame.create_window(950, 500, window=self.label1)
         self.entry2 = tk.Entry(self.connect_frame)
         self.connect_frame.create_window(200, 140, window=self.entry2)
         self.entry2.pack(side=tk.BOTTOM)
@@ -84,24 +86,24 @@ class Game:
                command=lambda: (self.connect_to_server())).pack(padx=400, pady=200)
 
     def connect_to_server(self):
-        # global client, HOST_PORT, HOST_ADDR
         try:
+            #save IP for next time
             self.file = open("server_ip.txt", "w")
             self.file.write(self.entry2.get())
             self.file.close()
             self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client.connect((self.entry2.get(), HOST_PORT))
             self.client.send(self.player.name.encode())
-            # client_thread = threading.Thread(target=self.receiveack, args=(self.client, "m"))
-            # client_thread.start()
             self.receiveack(self.client, "m")
         except Exception as e:
+            #if there was a problem with connecting
             print(e)
             tk.messagebox.showerror(title="ERROR!!!",
                                     message="Cannot connect to host: " + self.entry2.get() + " on port: " + str(
                                         HOST_PORT) + " Server may be unavailable. Try again later")
 
     def receiveack(self, sck, m):
+        #forget stuff of connect screen and display wait screen
         self.connect_frame.pack_forget()
         self.waiting_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.waiting_frame.pack(fill=BOTH, expand=True)
@@ -111,24 +113,23 @@ class Game:
         self.root.after(500, self.wait_loop, sck)
 
     def wait_loop(self, sck):
+        #wait for responses from server
         while not self.from_server.decode().startswith("CONNECTED: "):
             self.from_server = sck.recv(4096)
         self.c_j = self.from_server.decode()[11:]
         self.from_server = b""
         while not self.from_server.decode().startswith("NAMES: "):
             self.from_server = sck.recv(4096)
-            print(self.from_server.decode())
-            print(self.from_server.decode().startswith("NAMES: "))
+        #send signal to server
         sck.send("BEGIN".encode())
         self.root.after(0, self.initialize_names, sck)
 
     def initialize_names(self, sck):
-        print("in init names")
+        #display names of other players
         self.test_display.config(state=tk.NORMAL)
         self.test_display.delete("1.0", "end")
         message = ""
         message += self.from_server.decode()[7:]
-        print(message)
         self.test_display.insert(tk.END, message + '\n')
         self.test_display.config(state=tk.DISABLED)
         self.root.update()
@@ -139,12 +140,14 @@ class Game:
         self.root.mainloop()
 
     def main_screen(self, sck):
+        #initialize dice
         dice_list = [1, 2, 0, 4, 5, 6]
         self.dice_values = [1, 2, 0, 4, 5, 6]
         self.dice_selected = False
         self.rerolls = 0
         self.turn = 1
 
+        #roll dice
         self.dice_values[0] = random.choice(dice_list)
         self.dice_values[1] = random.choice(dice_list)
         self.dice_values[2] = random.choice(dice_list)
@@ -153,7 +156,6 @@ class Game:
         self.dice_values[5] = random.choice(dice_list)
 
         self.all_disabled = False
-        print("in main screen")
         self.waiting_frame.pack_forget()
         self.main_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.main_frame.pack(fill=BOTH, expand=True)
@@ -174,7 +176,6 @@ class Game:
         self.exit_btn = Button(self.main_frame, text="Exit", fg='#000000', command=lambda: (self.exit_game(sck)))
         self.unreg_btn = Button(self.main_frame, text="Exit & \nunregister", fg='#000000',
                                 command=lambda: (self.unreg_game(sck)))
-        # self.reroll.pack(padx=400, pady=200, side=tk.BOTTOM)
 
         self.d1.grid(row=0, column=0)
         self.d2.grid(row=0, column=1)
@@ -186,22 +187,19 @@ class Game:
         self.exit_btn.grid(row=2, column=1)
         self.unreg_btn.grid(row=2, column=0)
 
-        # self.player_scores = tk.Canvas(self.root, bg='#DCE0E1')
-        # self.player_scores.pack(fill=BOTH, expand=True, side=tk.RIGHT)
 
         self.dice_btn_list = [self.d1, self.d2, self.d3, self.d4, self.d5, self.d6]
         self.wait_play(sck)
         self.root.update()
 
     def wait_play(self, sck):
-        print("in wait_play")
+        #wait for responses from server
         self.from_server = b""
         for child in self.main_frame.winfo_children():
             child.configure(state='disable')
         while not self.from_server.decode().startswith("PLAY"):
+            #wait for signal of your turn
             self.from_server = sck.recv(4096)
-            print(self.from_server.decode())
-            print(self.from_server.decode().startswith("PLAY"))
             self.d1.grid(row=0, column=0)
             self.d2.grid(row=0, column=1)
             self.d3.grid(row=0, column=2)
@@ -220,6 +218,7 @@ class Game:
                 break
 
         if self.from_server.decode().startswith("WINNERS:"):
+            #signal that game has ended
             self.end_game(sck)
             self.root.update()
         for child in self.main_frame.winfo_children():
@@ -227,6 +226,7 @@ class Game:
         self.root.mainloop()
 
     def end_game(self, sck):
+        #display winners and exit
         self.main_frame.pack_forget()
         self.end_screen = tk.Canvas(self.root, bg='#DCE0E1')
         self.end_screen.pack(fill=BOTH, expand=True)
@@ -238,19 +238,18 @@ class Game:
         self.root.mainloop()
 
     def get_scores(self):
+        #to display scores in main_screen
         self.test_display.config(state=tk.NORMAL)
         self.test_display.delete("1.0", "end")
         message = ""
         message += self.the_message[7:]
-        print(message)
         self.test_display.insert(tk.END, message + '\n')
         self.test_display.config(state=tk.DISABLED)
         self.root.update()
 
     def reroll(self):
+        #rerolls dice under right conditions
         dice_list = [1, 2, 0, 4, 5, 6]
-        print("rerolls: " + str(self.rerolls))
-        print("dice_selected: " + str(self.dice_selected))
         if self.dice_selected:
             i = 0
             for btn in self.dice_btn_list:
@@ -264,6 +263,7 @@ class Game:
             tk.messagebox.showerror(title="Input needed!", message="Cannot reroll dice until one has been selected!")
 
     def check_if_selected(self):
+        #check if all buttons selected
         selected = False
         for btn in self.dice_btn_list:
             if btn["state"] == "disabled":
@@ -271,14 +271,11 @@ class Game:
         return selected
 
     def on_click(self, index, sck):
+        #when dice is selected
         self.dice_btn_list[index]["state"] = "disabled"
         self.dice_selected = True
-        print("current player score: " + str(self.player.score))
-        print("dice value: " + str(self.dice_values[index]))
         self.player.score += self.dice_values[index]
         self.check_btns(sck)
-        print("Score: " + str(self.player.score))
-        print("dice_selected: " + str(self.dice_selected))
 
     def check_btns(self, sck):
         self.all_disabled = True
@@ -286,7 +283,6 @@ class Game:
             if btn["state"] == "normal":
                 self.all_disabled = False
         if self.all_disabled:
-            print("all buttons are disabled")
             sck.send(("SCORE: " + str(self.player.score)).encode())
             self.turn += 1
             self.after_turn(sck)
@@ -303,8 +299,9 @@ class Game:
         self.wait_play(sck)
 
     def exit_game(self, sck):
+        #used in main_screen exit
         sck.send("EXIT".encode())
-        # wait for server to get exit?
+        # wait for server to get exit
         self.from_server = b""
         while not self.from_server.decode().startswith("EXIT"):
             self.from_server = sck.recv(4096)
@@ -313,8 +310,9 @@ class Game:
         exit(0)
 
     def unreg_game(self, sck):
+        #used in main_screen exit & unregister
         sck.send("UNREG".encode())
-        # wait for server to get exit?
+        # wait for server to get exit
         while not self.from_server.decode().startswith("EXIT"):
             self.from_server = sck.recv(4096)
         self.close_sck()
@@ -322,10 +320,12 @@ class Game:
         exit(0)
 
     def end_game_exit(self):
+        #after end_game
         self.close_sck()
         self.root.destroy()
         exit(0)
 
 
 if __name__ == "__main__":
+    #start game
     Game()

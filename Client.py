@@ -69,10 +69,10 @@ class Game:
         # self.label1.pack(side=tk.BOTTOM)
         self.test_display.config(state=tk.NORMAL)
         #print(self.file.read())
-        file_content = self.file.read().rstrip()
-        print(file_content)
+        self.file_content = self.file.read().rstrip()
+        print(self.file_content)
         self.file.close()
-        m = 'Please enter IP address of server to continue \n' + 'Last used IP address: ' + file_content + '\n' + self.player.name + ': ' + str(self.player.score) + '\n'
+        m = 'Please enter IP address of server to continue \n' + 'Last used IP address: ' + self.file_content + '\n' + self.player.name + ': ' + str(self.player.score) + '\n'
         self.test_display.insert(tk.END, m)
         self.test_display.config(state=tk.DISABLED)
         # self.connect_frame.create_window(950, 500, window=self.label1)
@@ -98,7 +98,7 @@ class Game:
         except Exception as e:
             print(e)
             tk.messagebox.showerror(title="ERROR!!!",
-                                    message="Cannot connect to host: " + HOST_ADDR + " on port: " + str(
+                                    message="Cannot connect to host: " + self.file_content + " on port: " + str(
                                         HOST_PORT) + " Server may be unavailable. Try again later")
 
     def receiveack(self, sck, m):

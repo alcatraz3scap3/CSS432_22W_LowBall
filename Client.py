@@ -58,7 +58,7 @@ class Game:
         self.player.name = self.entry1.get()
 
     def connect_screen(self):
-        self.file = open("server_ip.txt", "w")  #to create the file
+        self.file = open("server_ip.txt", "a")  #to create the file
         self.file.close()
         self.file = open("server_ip.txt", "r")
         self.welcome_frame.pack_forget()

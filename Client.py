@@ -98,7 +98,7 @@ class Game:
         except Exception as e:
             print(e)
             tk.messagebox.showerror(title="ERROR!!!",
-                                    message="Cannot connect to host: " + self.file_content + " on port: " + str(
+                                    message="Cannot connect to host: " + self.entry2.get() + " on port: " + str(
                                         HOST_PORT) + " Server may be unavailable. Try again later")
 
     def receiveack(self, sck, m):
@@ -111,6 +111,10 @@ class Game:
         self.root.after(500, self.wait_loop, sck)
 
     def wait_loop(self, sck):
+        while not self.from_server.decode().startswith("CONNECTED: "):
+            self.from_server = sck.recv(4096)
+        self.c_j = self.from_server.decode()[11:]
+        self.from_server = b""
         while not self.from_server.decode().startswith("NAMES: "):
             self.from_server = sck.recv(4096)
             print(self.from_server.decode())
@@ -131,7 +135,7 @@ class Game:
         self.root.after(0, self.after_loop(sck))
 
     def after_loop(self, sck):
-        Button(self.waiting_frame, text='Continue', fg='#000000', command=lambda: (self.main_screen(sck))).pack()
+        Button(self.waiting_frame, text=self.c_j, fg='#000000', command=lambda: (self.main_screen(sck))).pack()
         self.root.mainloop()
 
     def main_screen(self, sck):

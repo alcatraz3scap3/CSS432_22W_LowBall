@@ -301,6 +301,9 @@ class Game:
     def exit_game(self, sck):
         sck.send("EXIT".encode())
         # wait for server to get exit?
+        self.from_server = b""
+        while not self.from_server.decode().startswith("EXIT"):
+            self.from_server = sck.recv(4096)
         self.close_sck()
         self.root.destroy()
         exit(0)
@@ -308,6 +311,8 @@ class Game:
     def unreg_game(self, sck):
         sck.send("UNREG".encode())
         # wait for server to get exit?
+        while not self.from_server.decode().startswith("EXIT"):
+            self.from_server = sck.recv(4096)
         self.close_sck()
         self.root.destroy()
 

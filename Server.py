@@ -41,14 +41,23 @@ players = []
 out_players = []
 MAX_PLAYERS = 2
 MAX_SCORE = 50
+users = list()
+already_saved = False
 
-class Player(Thread):
+class User():   # for the user profile
+    def __init__(self, username, games_won):
+        self.username = username
+        self.games_won = int(games_won)
+
+class Player(Thread):   # for the game
     def __init__(self, name, socket, num):
         Thread.__init__(self)
         self.name = name
         self.playerSocket = socket
         self.num = num
         self.score_array = []
+        self.stay_registered = True
+        self.won = False
 
     def addScore(self, points):
         # cumulative score array
@@ -99,9 +108,15 @@ def acceptClients(a_server):
         print("waiting for connections")
         cliSock, address = a_server.accept()
 
-        # ack client connection
-        connected = "CONNECTED"
+        # ack client connection; tell who is creating and who is joining the game
+        connected = ""
+        if player_number == 1:
+            connected = "CONNECTED: CREATE"
+        else:
+            connected = "CONNECTED: JOIN"
         cliSock.send(connected.encode())
+
+        # recv player data from client
         player_name = cliSock.recv(2048)
         new_player = Player(player_name.decode(), cliSock, player_number)
         print(new_player.name)
@@ -124,6 +139,10 @@ def acceptClients(a_server):
     while not players_ack >= MAX_PLAYERS:
         for player in players:
             data = player.playerSocket.recv(4096).decode()
+            if data.startswith("UNREG"):
+                unregisterAndExit(player)
+            if data.startswith("EXIT"):
+                playerExit(player)
             if data.startswith("BEGIN"):
                 players_ack += 1
 
@@ -160,6 +179,7 @@ def endGame():
 
     # scenario 1: only 1 winner: all other players are out previous rounds
     if len(players) == 1:
+        players[0].won = True
         winners.append(players[0])
     else:
         # scenario 2: multiple winners, players with the longest score arrays win (aka they hit max same round)
@@ -173,6 +193,7 @@ def endGame():
         # find players with that length score_array and add them to the winners list
         for player in out_players:
             if len(player.score_array) == longest_score_array:
+                player.won = True
                 winners.append(player)
 
     # send winners to all players
@@ -198,12 +219,34 @@ def endGame():
     for player in out_players:
         player.playerSocket.send(msg.encode())
 
+    #check for unregstered users
+    for player in players:
+        data = player.playerSocket.recv(4096).decode()
+        if data.startswith("UNREG"):
+            unregisterAndExit(player)
+        if data.startswith("EXIT"):
+            playerExit(player)
+
     # close sockets
     for player in players:
         player.playerSocket.close()
     for player in out_players:
         player.playerSocket.close()
 
+    global already_saved
+    if not already_saved:
+        savePlayers()
+
+    # display global scoreboard
+    text_display.config(state=tk.NORMAL)
+    text_display.delete('1.0', tk.END)
+
+    for c in users:
+        print("HERE")
+        text_display.insert(tk.END, c.username + ', games won: ' + str(c.games_won) + '\n')
+    text_display.config(state=tk.DISABLED)
+    window.update()
+    sleep(5)
     exit(2)
 
 # sends every player all the players scores
@@ -226,7 +269,14 @@ def sendScores():
     while recvd < MAX_PLAYERS:
         for player in players:
             print("waiting to recv ack from clis in PLAYERS")
-            if player.playerSocket.recv(4096).decode().startswith("RECV SCORE"):
+            data = player.playerSocket.recv(4096).decode()
+            if data.startswith("UNREG"):
+                unregisterAndExit(player)
+                recvd += 1
+            if data.startswith("EXIT"):
+                playerExit(player)
+                recvd += 1
+            if data.startswith("RECV SCORE"):
                 recvd += 1
                 print("GOT " + str(recvd) + " SCORE ACK in players from: " + player.getName())
                 player.playerSocket.send("RECV ACK".encode())
@@ -234,7 +284,14 @@ def sendScores():
                 break
         for player in out_players:
             print("waiting to recv ack from clis FROM OUT PLAYERS")
-            if player.playerSocket.recv(4096).decode().startswith("RECV SCORE"):
+            data = player.playerSocket.recv(4096).decode()
+            if data.startswith("UNREG"):
+                unregisterAndExit(player)
+                recvd += 1
+            if data.startswith("EXIT"):
+                playerExit(player)
+                recvd += 1
+            if data.startswith("RECV SCORE"):
                 recvd += 1
                 print("GOT " + str(recvd) + " SCORE ACK in players_out from: " + player.getName())
                 player.playerSocket.send("RECV ACK".encode())
@@ -285,6 +342,12 @@ def takeTurn(player):
     # wait for player response
     while not response:
         data = player.playerSocket.recv(4096).decode()
+        if data.startswith("UNREG"):
+            unregisterAndExit(player)
+            response = True
+        if data.startswith("EXIT"):
+            playerExit(player)
+            response = True
         if data.startswith("SCORE: "):
             response = True
             score = int(data[7:])       # gets everything after SCORE:
@@ -295,5 +358,122 @@ def takeTurn(player):
     player.playerSocket.send(wait.encode())
     print("player " + player.getName() + " turn over, sent WAIT to client")
     return score
+
+def savePlayers():
+    f = open("users.txt", "r")  # "r" says we are reading from the file
+    # loop through the file and put all the username - game won pairs into a list
+    for user in f:
+        space = user.find(' ')  # everything before space is the name, after is the # of times the user has won a game
+        username = user[0:space]  # gets the username (aka everything before the space)
+        games_won = user[(space + 1):]  # gets the # of games won (aka everything after the space)
+        new_user = User(username, games_won)
+        users.append(new_user)
+
+    #   update the list of players who wish to stay registered
+    for player in players:
+        if player.stay_registered:
+            if player.won:
+                registerUser(player.getName(), 1)   # add 1 to the games_won
+            else:
+                registerUser(player.getName(), 0)   # add 0 to the games_won
+        else:
+            removeUser(player.getName())
+
+    for player in out_players:
+        if player.stay_registered:
+            if player.won:
+                registerUser(player.getName(), 1)   # add 1 to the games_won
+            else:
+                registerUser(player.getName(), 0)   # add 0 to the games_won
+        else:
+            removeUser(player.getName())
+    f.close()
+
+    #   re-write all users to the user file
+    f = open("users.txt", "w")
+    for user in users:
+        f.write(user.username + " " + str(user.games_won) + "\n")
+    f.close()
+
+
+def removeUser(name):
+    for user in users:
+        if user.username == name:
+            users.remove(user)
+
+# register new users and update existing users
+def registerUser(name, won):
+    in_list = False
+    index = 0
+
+    # find the user & index
+    for user in users:
+        if user.username == name:
+            in_list = True
+            break
+        index += 1
+
+    if not in_list:
+        new_user = User(name, won)
+        users.append(new_user)
+    else:
+        users[index].games_won += won
+
+def unregisterAndExit(player):
+    player.stay_registered = False
+
+    players.remove(player)
+
+    in_list = False
+    for p in out_players:
+        if p.getName() == player.getName():
+            in_list = True
+
+    if not in_list:
+        out_players.append(player)
+
+    player.playerSocket.send('EXIT'.encode())
+
+    if len(players) > 0:
+        players[0].won = True
+
+    for p in out_players:
+        if p.getName() != player.getName():
+            p.won = True
+
+    global already_saved
+    if not already_saved:
+        savePlayers()
+        already_saved = True
+
+    out_players.remove(player)
+    endGame()
+
+def playerExit(player):
+    players.remove(player)
+
+    in_list = False
+    for p in out_players:
+        if p.getName() == player.getName():
+            in_list = True
+
+    if not in_list:
+        out_players.append(player)
+    player.playerSocket.send('EXIT'.encode())
+
+    if len(players) > 0:
+        players[0].won = True
+
+    for p in out_players:
+        if p.getName() != player.getName():
+            p.won = True
+
+    global already_saved
+    if not already_saved:
+        savePlayers()
+        already_saved = True
+
+    out_players.remove(player)
+    endGame()
 
 window.mainloop()

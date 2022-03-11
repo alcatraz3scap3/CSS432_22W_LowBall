@@ -11,17 +11,21 @@ import socket
 import random
 
 client = None
-HOST_ADDR = "10.102.104.16"
+HOST_ADDR = "10.156.3.172"
 HOST_PORT = 8080
 
+
+
 class Player():
-    def __init__(self,name):
+    def __init__(self, name):
         self.name = name
         self.score = 0
+
 
 class Game:
     player = Player('Test1')
     from_server = b""
+
 
     def __init__(self):
         self.root = tk.Tk()
@@ -35,7 +39,7 @@ class Game:
 
     def welcome_screen(self):
         self.welcome_frame = tk.Canvas(self.root, bg='#DCE0E1')
-        self.welcome_frame.pack(fill=BOTH,expand=True)
+        self.welcome_frame.pack(fill=BOTH, expand=True)
 
         Label(self.welcome_frame, text='Enter name',
               bg='#DCE0E1', fg='#000000',
@@ -54,43 +58,57 @@ class Game:
         self.player.name = self.entry1.get()
 
     def connect_screen(self):
+        self.file = open("server_ip.txt", "r")
         self.welcome_frame.pack_forget()
         self.entry1.destroy()
         self.connect_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.connect_frame.pack(fill=BOTH, expand=True)
-        #self.label1 = tk.Label(self.connect_frame, text=self.player.name, bg='#DCE0E1')
-        #self.label1.pack(side=tk.BOTTOM)
+        # self.label1 = tk.Label(self.connect_frame, text=self.player.name, bg='#DCE0E1')
+        # self.label1.pack(side=tk.BOTTOM)
         self.test_display.config(state=tk.NORMAL)
-        self.test_display.insert(tk.END, self.player.name + ': ' + str(self.player.score) + '\n')
+        #print(self.file.read())
+        file_content = self.file.read().rstrip()
+        print(file_content)
+        self.file.close()
+        m = 'Please enter IP address of server to continue \n' + 'Last used IP address: ' + file_content + '\n' + self.player.name + ': ' + str(self.player.score) + '\n'
+        self.test_display.insert(tk.END, m)
         self.test_display.config(state=tk.DISABLED)
-        #self.connect_frame.create_window(950, 500, window=self.label1)
+        # self.connect_frame.create_window(950, 500, window=self.label1)
+        self.entry2 = tk.Entry(self.connect_frame)
+        self.connect_frame.create_window(200, 140, window=self.entry2)
+        self.entry2.pack(side=tk.BOTTOM)
 
         Button(self.connect_frame, text='Connect', fg='#000000',
                command=lambda: (self.connect_to_server())).pack(padx=400, pady=200)
 
     def connect_to_server(self):
-        #global client, HOST_PORT, HOST_ADDR
+        # global client, HOST_PORT, HOST_ADDR
         try:
+            self.file = open("server_ip.txt", "w")
+            self.file.write(self.entry2.get())
+            self.file.close()
             self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.client.connect((HOST_ADDR, HOST_PORT))
+            self.client.connect((self.entry2.get(), HOST_PORT))
             self.client.send(self.player.name.encode())
-            #client_thread = threading.Thread(target=self.receiveack, args=(self.client, "m"))
-            #client_thread.start()
+            # client_thread = threading.Thread(target=self.receiveack, args=(self.client, "m"))
+            # client_thread.start()
             self.receiveack(self.client, "m")
         except Exception as e:
             print(e)
-            tk.messagebox.showerror(title="ERROR!!!", message="Cannot connect to host: " + HOST_ADDR + " on port: " + str(HOST_PORT) + " Server may be unavailable. Try again later")
+            tk.messagebox.showerror(title="ERROR!!!",
+                                    message="Cannot connect to host: " + HOST_ADDR + " on port: " + str(
+                                        HOST_PORT) + " Server may be unavailable. Try again later")
 
-    def receiveack(self,sck,m):
+    def receiveack(self, sck, m):
         self.connect_frame.pack_forget()
         self.waiting_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.waiting_frame.pack(fill=BOTH, expand=True)
         self.wait_label = tk.Label(self.waiting_frame, text="Waiting on server...", bg='#DCE0E1')
         self.wait_label.pack(side=tk.BOTTOM)
         self.waiting_frame.create_window(950, 500, window=self.wait_label)
-        self.root.after(500,self.wait_loop,sck)
+        self.root.after(500, self.wait_loop, sck)
 
-    def wait_loop(self,sck):
+    def wait_loop(self, sck):
         while not self.from_server.decode().startswith("NAMES: "):
             self.from_server = sck.recv(4096)
             print(self.from_server.decode())
@@ -114,7 +132,7 @@ class Game:
         Button(self.waiting_frame, text='Continue', fg='#000000', command=lambda: (self.main_screen(sck))).pack()
         self.root.mainloop()
 
-    def main_screen(self,sck):
+    def main_screen(self, sck):
         dice_list = [1, 2, 0, 4, 5, 6]
         self.dice_values = [1, 2, 0, 4, 5, 6]
         self.dice_selected = False
@@ -133,17 +151,24 @@ class Game:
         self.waiting_frame.pack_forget()
         self.main_frame = tk.Canvas(self.root, bg='#DCE0E1')
         self.main_frame.pack(fill=BOTH, expand=True)
-        self.d1 = Button(self.main_frame,text=self.dice_values[0],font=('',15), width=6, height=3, command=lambda: self.on_click(0, sck))
-        self.d2 = Button(self.main_frame, text=self.dice_values[1], font=('', 15), width=6, height=3, command=lambda: self.on_click(1, sck))
-        self.d3 = Button(self.main_frame, text=self.dice_values[2], font=('', 15), width=6, height=3, command=lambda: self.on_click(2, sck))
-        self.d4 = Button(self.main_frame, text=self.dice_values[3], font=('', 15), width=6, height=3, command=lambda: self.on_click(3, sck))
-        self.d5 = Button(self.main_frame, text=self.dice_values[4], font=('', 15), width=6, height=3, command=lambda: self.on_click(4, sck))
-        self.d6 = Button(self.main_frame, text=self.dice_values[5], font=('', 15), width=6, height=3, command=lambda: self.on_click(5, sck))
+        self.d1 = Button(self.main_frame, text=self.dice_values[0], font=('', 15), width=6, height=3,
+                         command=lambda: self.on_click(0, sck))
+        self.d2 = Button(self.main_frame, text=self.dice_values[1], font=('', 15), width=6, height=3,
+                         command=lambda: self.on_click(1, sck))
+        self.d3 = Button(self.main_frame, text=self.dice_values[2], font=('', 15), width=6, height=3,
+                         command=lambda: self.on_click(2, sck))
+        self.d4 = Button(self.main_frame, text=self.dice_values[3], font=('', 15), width=6, height=3,
+                         command=lambda: self.on_click(3, sck))
+        self.d5 = Button(self.main_frame, text=self.dice_values[4], font=('', 15), width=6, height=3,
+                         command=lambda: self.on_click(4, sck))
+        self.d6 = Button(self.main_frame, text=self.dice_values[5], font=('', 15), width=6, height=3,
+                         command=lambda: self.on_click(5, sck))
 
         self.reroll_btn = Button(self.main_frame, text='Reroll', fg='#000000', command=lambda: (self.reroll()))
         self.exit_btn = Button(self.main_frame, text="Exit", fg='#000000', command=lambda: (self.exit_game(sck)))
-        self.unreg_btn = Button(self.main_frame, text="Exit and unregister", fg='#000000', command=lambda: (self.unreg_game(sck)))
-        #self.reroll.pack(padx=400, pady=200, side=tk.BOTTOM)
+        self.unreg_btn = Button(self.main_frame, text="Exit & \nunregister", fg='#000000',
+                                command=lambda: (self.unreg_game(sck)))
+        # self.reroll.pack(padx=400, pady=200, side=tk.BOTTOM)
 
         self.d1.grid(row=0, column=0)
         self.d2.grid(row=0, column=1)
@@ -155,8 +180,8 @@ class Game:
         self.exit_btn.grid(row=2, column=1)
         self.unreg_btn.grid(row=2, column=0)
 
-        #self.player_scores = tk.Canvas(self.root, bg='#DCE0E1')
-        #self.player_scores.pack(fill=BOTH, expand=True, side=tk.RIGHT)
+        # self.player_scores = tk.Canvas(self.root, bg='#DCE0E1')
+        # self.player_scores.pack(fill=BOTH, expand=True, side=tk.RIGHT)
 
         self.dice_btn_list = [self.d1, self.d2, self.d3, self.d4, self.d5, self.d6]
         self.wait_play(sck)
@@ -189,7 +214,6 @@ class Game:
                 break
 
         if self.from_server.decode().startswith("WINNERS:"):
-
             self.end_game(sck)
             self.root.update()
         for child in self.main_frame.winfo_children():
@@ -216,7 +240,6 @@ class Game:
         self.test_display.insert(tk.END, message + '\n')
         self.test_display.config(state=tk.DISABLED)
         self.root.update()
-
 
     def reroll(self):
         dice_list = [1, 2, 0, 4, 5, 6]
@@ -275,7 +298,7 @@ class Game:
 
     def exit_game(self, sck):
         sck.send("EXIT".encode())
-        #wait for server to get exit?
+        # wait for server to get exit?
         self.close_sck()
         self.root.destroy()
         exit(0)
@@ -285,6 +308,7 @@ class Game:
         # wait for server to get exit?
         self.close_sck()
         self.root.destroy()
+
 
 if __name__ == "__main__":
     Game()
